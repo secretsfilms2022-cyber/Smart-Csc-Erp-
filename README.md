@@ -36,3 +36,18 @@ Required Cloudflare Worker secrets remain in Cloudflare and must never be commit
 - `RAZORPAY_KEY_SECRET`
 
 Do not commit Supabase service-role/secret keys. The client-facing Supabase publishable key is intentionally part of the current live application.
+
+## Atomic Mail ERP integration
+
+The ERP now includes a server-side Atomic Mail bridge and an upgraded Communication Center for the mailbox `surajkatira@smartcsc.work.gd`.
+
+Required Cloudflare Worker secret (never commit it):
+- `ATOMIC_MAIL_API_KEY` — the API key from the Atomic Mail inbox Connect dialog.
+
+The bridge uses the hosted Atomic Mail MCP endpoint server-side. The key is never sent to the browser.
+
+### Current manual configuration blockers
+- Add `ATOMIC_MAIL_API_KEY` to the production Worker secret store.
+- Add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` to GitHub Actions repository secrets for automatic deployment.
+
+The GitHub CI currently also reports a pre-existing JavaScript syntax error in the recovered monolithic Worker source; this must be repaired before a production deployment can be declared successful.
