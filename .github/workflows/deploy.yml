@@ -40,6 +40,14 @@ jobs:
           if (!healthJson.ok || healthJson.service !== "smart-csc-erp") {
             throw new Error("Health check returned an unexpected payload");
           }
+          const page = await fetch(base + "/", { cache: "no-store" });
+          if (!page.ok) throw new Error("ERP page check failed: HTTP " + page.status);
+          const pageHtml = await page.text();
+          if (!pageHtml.includes("Smart CSC Gorakhpur ERP")) {
+            throw new Error("ERP page did not return the expected login shell");
+          }
+          const appJs = await fetch(base + "/app.js", { cache: "no-store" });
+          if (!appJs.ok) throw new Error("ERP app.js check failed: HTTP " + appJs.status);
           const challenge = "ci-" + Date.now();
           const webhook = await fetch(base + "/api/email/webhook", {
             method: "POST",
