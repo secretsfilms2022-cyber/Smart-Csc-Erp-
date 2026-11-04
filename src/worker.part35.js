@@ -110,6 +110,7 @@ async function atomicEmailSync(session){
  return {scanned,imported,last_received_at:lastReceived,last_message_id:lastMessageId,synced_at:now};
 }
 if(url.pathname==="/api/email/webhook"&&req.method==="POST")return await atomicWebhookHandler(req);\nasync function atomicEmailHandler(req,url){
+ if(url.pathname==="/api/email/webhook"&&req.method==="POST")return await atomicWebhookHandler(req);
  const session=await atomicAuth(req);
  if(!session)return new Response(JSON.stringify({message:"Unauthorized"}),{status:401,headers:{"content-type":"application/json","cache-control":"no-store"}});
  try{
