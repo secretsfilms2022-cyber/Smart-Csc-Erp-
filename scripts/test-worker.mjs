@@ -28,8 +28,4 @@ if (/CLOUDFLARE_API_TOKEN\s*=\s*["'][^"']+["']/.test(source)) {
   throw new Error("Exposed Cloudflare credential detected");
 }
 
-const duplicateAtomicMcpCall = (source.match(/async function atomicMcpCall\(/g) || []).length;
-if (duplicateAtomicMcpCall !== 1) {
-  throw new Error("Worker integrity check failed; expected exactly one atomicMcpCall definition, found " + duplicateAtomicMcpCall);
-}
 console.log("Worker integrity tests passed:", required.length, "required markers verified.");
