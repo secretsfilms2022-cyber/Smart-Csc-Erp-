@@ -90,7 +90,7 @@
         "<section class='mail-main'><div class='mail-toolbar'><input id='mailSearch' placeholder='Search mail, sender, subject, customer, application...' value='"+mailEsc(mailState.search)+"'><button class='btn secondary' id='mailRefresh'>Refresh</button></div><div id='mailList'></div></section>"+
         "</div></div>";
       document.getElementById("main").innerHTML=h;
-      document.querySelectorAll("[data-mail-folder]").forEach(function(b){b.onclick=function(){mailState.folder=b.getAttribute("data-mail-folder");mailRenderList()}}});
+      document.querySelectorAll("[data-mail-folder]").forEach(function(b){b.onclick=function(){mailState.folder=b.getAttribute("data-mail-folder");mailRenderList()}});
       document.getElementById("mailCompose").onclick=mailCompose;
       document.getElementById("mailCompose2").onclick=mailCompose;
       document.getElementById("mailSync").onclick=mailSync;
