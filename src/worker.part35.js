@@ -33,11 +33,11 @@ async function verifyAtomicWebhook(req,raw,event){
  const secret=typeof ATOMIC_MAIL_WEBHOOK_SECRET!=="undefined"?String(ATOMIC_MAIL_WEBHOOK_SECRET||""):"";
  if(event&&event.type==="verification"&&!secret)return true;
  if(!secret||!id||!ts||!sig)throw new Error("Webhook authentication is not configured");
- const n=Number(ts);if(!/^\\d+$/.test(ts)||!Number.isFinite(n)||Math.abs(Math.floor(Date.now()/1000)-n)>300)throw new Error("Webhook timestamp outside tolerance");
+ const n=Number(ts);if(!/^\d+$/.test(ts)||!Number.isFinite(n)||Math.abs(Math.floor(Date.now()/1000)-n)>300)throw new Error("Webhook timestamp outside tolerance");
  const keyBytes=b64Bytes(secret.replace(/^whsec_/,""));
  const key=await crypto.subtle.importKey("raw",keyBytes,{name:"HMAC",hash:"SHA-256"},false,["verify"]);
  const data=new TextEncoder().encode(id+"."+ts+"."+raw);
- const entries=sig.split(/\\s+/).filter(function(x){return x.indexOf("v1,")===0});
+ const entries=sig.split(/\s+/).filter(function(x){return x.indexOf("v1,")===0});
  for(const entry of entries){try{if(await crypto.subtle.verify("HMAC",key,b64Bytes(entry.slice(3)),data))return true}catch(e){}}
  throw new Error("Invalid webhook signature");
 }
