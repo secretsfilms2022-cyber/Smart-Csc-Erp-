@@ -1,0 +1,40 @@
+"field"><label>Password</label><input id="password" type="password" autocomplete="current-password" placeholder="Enter your password" required></div><div class="loginhint"><label style="display:flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" style="width:16px;height:16px;accent-color:#0b9b92"> Remember me</label><span class="secure"><i></i> Secure authentication</span></div><button id="signInBtn" class="btn" type="submit">Sign In</button></form><div class="loginsecondary"><button id="setup" class="btn secondary" type="button">Create first Super Admin</button><button id="resetSession" class="btn secondary" type="button">Reset Login Session</button><button id="forgotPassword" class="btn secondary" type="button">Forgot Password?</button></div><div class="loginlegal">Your authentication is protected by Supabase Auth + Row Level Security.<br>No service-role key is exposed to the browser.</div></section></div></div><div id="app" class="hide"><header class="top"><div class="topbrand"><div class="brand" style="font-size:20px">SMART <b>CSC</b></div><div class="muted" style="font-size:9px">GORAKHPUR ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ ERP</div></div><div class="topsearch"><input id="search" placeholder="Search customers, applications, invoices, tasks..."></div><div class="topright"><span class="dot"></span><span class="muted" style="font-size:10px">LIVE</span><div id="avatar" class="avatar">A</div><div><b id="uname">Admin</b><div id="role" class="muted" style="font-size:10px">ERP User</div></div><button id="logout" class="btn secondary">Logout</button></div></header><div class="layout"><aside class="side"><div class="sidehead"><b>SMART CSC GORAKHPUR</b><small id="businessName">Business ERP</small></div><nav id="nav" class="nav"></nav><div class="sidefoot">Production workspace<br>Supabase Auth + RLS<br>Smart Digital Studio remains separate.</div></aside><main id="main" class="main"></main></div><div id="mobile" class="mobile"></div></div>
+<div id="modal" class="modal"><div class="modalbox"><div class="modalhead"><h2 id="mt">Form</h2><button id="close" class="btn secondary">Close</button></div><div id="mb"></div></div></div><div id="toast" class="toast hide"></div>
+<script>window.addEventListener("error",function(e){var x=document.getElementById("err");if(x)x.innerHTML="<b>ERP JavaScript error:</b><br>"+String(e.message||"Unknown error")+"<br><small>Line: "+(e.lineno||"?")+" Column: "+(e.colno||"?")+"</small>";});window.addEventListener("unhandledrejection",function(e){var x=document.getElementById("err");if(x)x.innerHTML="<b>ERP startup error:</b><br>"+String(e.reason&&e.reason.message||e.reason||"Unknown error");});</script>
+<script src="/app.js?v=erp-ui-43-20261102"></script></body></html>`;
+async function apiHandler(req,url){
+ const h={"content-type":"application/json; charset=utf-8","cache-control":"no-store"};
+ if(url.pathname==="/api/ai/ask"&&req.method==="POST"){
+  const authz=req.headers.get("Authorization")||"";
+  if(!authz)return new Response(JSON.stringify({message:"No session"}),{status:401,headers:h});
+  const apiKey=(typeof GEMINI_API_KEY!=="undefined"?GEMINI_API_KEY:"");
+  if(!apiKey)return new Response(JSON.stringify({message:"Gemini API is not configured on this Worker."}),{status:503,headers:h});
+  const b=await req.json().catch(()=>({})); const question=String(b.question||"").trim(); const businessId=String(b.business_id||"").trim();
+  if(!question)return new Response(JSON.stringify({message:"question is required"}),{status:400,headers:h});
+  if(question.length>4000)return new Response(JSON.stringify({message:"Question is too long (max 4000 characters)."}),{status:400,headers:h});
+  if(!businessId)return new Response(JSON.stringify({message:"business_id is required"}),{status:400,headers:h});
+  const ah=new Headers({apikey:KEY,Authorization:authz});
+  const ur=await fetch(SB+"/auth/v1/user",{headers:ah}); const u=await ur.json().catch(()=>({}));
+  if(!ur.ok||!u.id)return new Response(JSON.stringify({message:"Invalid ERP session"}),{status:401,headers:h});
+  const pr=await fetch(SB+"/rest/v1/profiles?id=eq."+encodeURIComponent(u.id)+"&select=business_id,is_active,full_name",{headers:ah});
+  const profiles=await pr.json().catch(()=>[]); const prof=profiles&&profiles[0];
+  if(!prof||prof.is_active===false||String(prof.business_id)!==businessId)return new Response(JSON.stringify({message:"ERP business access denied"}),{status:403,headers:h});
+  const now=new Date(); const from=new Date(now.getTime()-30*86400000); const fromDate=from.toISOString().slice(0,10);
+  const [sr,lr,ar,ir,mlr,rdr]=await Promise.all([
+    fetch(SB+"/rest/v1/ledger_daily_summary?business_id=eq."+encodeURIComponent(businessId)+"&transaction_date=gte."+encodeURIComponent(fromDate)+"&order=transaction_date.desc&limit=31",{headers:ah}),
+    fetch(SB+"/rest/v1/ledger_entries?business_id=eq."+encodeURIComponent(businessId)+"&select=transaction_at,entry_type,amount,signed_amount,source_type,payment_method,reference,description&order=transaction_at.desc&limit=30",{headers:ah}),
+    fetch(SB+"/rest/v1/applications?business_id=eq."+encodeURIComponent(businessId)+"&balance=gt.0&select=application_no,service_fee,amount_paid,balance,payment_status,application_date,status&order=application_date.desc&limit=80",{headers:ah}),
+    fetch(SB+"/rest/v1/invoices?business_id=eq."+encodeURIComponent(businessId)+"&select=invoice_no,total,paid,balance,status,invoice_date&order=invoice_date.desc&limit=50",{headers:ah}),
+    fetch(SB+"/rest/v1/money_lent_summary?business_id=eq."+encodeURIComponent(businessId)+"&select=person_name,mobile,amount_lent,total_repaid,outstanding_amount,lent_date,expected_return_date,purpose,status&order=lent_date.desc&limit=200",{headers:ah}),
+    fetch(SB+"/rest/v1/receivables_daily_summary?business_id=eq."+encodeURIComponent(businessId)+"&select=transaction_date,amount_lent,repayments_received,net_receivable_out&order=transaction_date.desc&limit=60",{headers:ah})
+  ]);
+  const [summary,ledger,pending,invoices,moneyLent,receivablesDaily]=await Promise.all([sr.json().catch(()=>[]),lr.json().catch(()=>[]),ar.json().catch(()=>[]),ir.json().catch(()=>[]),mlr.json().catch(()=>[]),rdr.json().catch(()=>[])]);
+  const context={generated_at:now.toISOString(),period_from:fromDate,period_to:now.toISOString().slice(0,10),daily_ledger_summary:summary||[],recent_ledger_entries:ledger||[],pending_applications:pending||[],recent_invoices:invoices||[],money_lent_receivables:moneyLent||[],receivables_daily:receivablesDaily||[]};
+  const system="You are Gemini, the secure AI analyst for Smart CSC Gorakhpur ERP. Use ONLY the supplied ERP context for business facts. Never invent amounts, dates, customers, payments, invoices, or transactions. If data is missing, say so. Prefer the central ledger as the financial source of truth. Distinguish revenue, expense, refund and net. Money lent to friends or relatives is a personal receivable, NOT business revenue or expense; never include money lent or repayments in revenue, expense, or net calculations. Use money_lent_receivables and receivables_daily for questions about money lent, repayments, outstanding amounts, or overdue people. Explain calculations when useful. Flag possible anomalies or duplicates as possibilities, not facts. You are read-only: never claim that you changed ERP records. Do not expose secrets, API keys, auth tokens, or internal security details. Keep answers practical and concise. Current date is "+now.toISOString().slice(0,10)+".";
+  const prompt="ERP QUESTION:\n"+question+"\n\nERP CONTEXT JSON:\n"+JSON.stringify(context);
+  // Prefer the lightweight stable model for ERP Q&A, then fall back to stronger models.
+  // This avoids capacity spikes and keeps normal ERP questions fast.
+  const geminiModels=["gemini-3.8-flash","gemini-3.6-flash","gemini-3.5-flash-lite"];
+  let gd=null, lastProviderStatus=0, lastProviderMessage="";
+  for(let mi=0;mi<geminiModels.length;mi++){
+    const model=geminiMo
