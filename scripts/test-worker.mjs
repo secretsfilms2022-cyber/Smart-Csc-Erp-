@@ -21,7 +21,10 @@ const missing = required.filter((needle) => !source.includes(needle));
 if (missing.length) {
   throw new Error("Worker integrity check failed; missing: " + missing.join(", "));
 }
-if (!source.includes("window.mailPage=mailPage") || source.includes("var originalGo=go;")) {\n  throw new Error("Mail module bootstrap integrity check failed; cross-scope navigation dependency detected");\n}\nif (/8fad7d9b-5609-4d14-b81d-5047cf01f41b/.test(source)) {
+if (!source.includes("window.mailPage=mailPage") || source.includes("var originalGo=go;")) {
+  throw new Error("Mail module bootstrap integrity check failed; cross-scope navigation dependency detected");
+}
+if (/8fad7d9b-5609-4d14-b81d-5047cf01f41b/.test(source)) {
   throw new Error("Exposed Atomic Mail credential detected");
 }
 if (/CLOUDFLARE_API_TOKEN\s*=\s*["'][^"']+["']/.test(source)) {
