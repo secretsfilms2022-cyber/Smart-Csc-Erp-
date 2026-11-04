@@ -112,7 +112,9 @@ async function atomicEmailSync(session){
  await atomicSB(session,"/rest/v1/email_sync_state?on_conflict=business_id",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(state)});
  return {scanned,imported,last_received_at:lastReceived,last_message_id:lastMessageId,synced_at:now};
 }
-if(url.pathname==="/api/email/webhook"&&req.method==="POST")return await atomicWebhookHandler(req);\nasync function atomicEmailHandler(req,url){
+async function atomicEmailHandler(req,url){
+ if(!url.pathname.startsWith("/api/email/"))return null;
+ if(url.pathname==="/api/email/webhook"&&req.method==="POST")return await atomicWebhookHandler(req);
  if(!url.pathname.startsWith("/api/email/"))return null;
  if(url.pathname==="/api/email/webhook"&&req.method==="POST")return await atomicWebhookHandler(req);
  const session=await atomicAuth(req);
