@@ -14,7 +14,7 @@ window.communicationsPage=async function(){
  function compose(){var box=document.getElementById("emailComposeBox");box.innerHTML="<div class='formgrid'><div class='field span2'><label>To</label><input id='emailTo' type='email' placeholder='customer@example.com'></div><div class='field span2'><label>Subject</label><input id='emailSubject' maxlength='200'></div><div class='field span2'><label>Message</label><textarea id='emailBody' style='min-height:180px'></textarea></div><div class='span2'><button id='emailSend' class='btn'>Send Email</button></div></div>";document.getElementById("emailSend").onclick=async function(){var to=document.getElementById("emailTo").value.trim(),subject=document.getElementById("emailSubject").value.trim(),body=document.getElementById("emailBody").value.trim();if(!to||!subject||!body)return toast("To, subject and message are required",true);this.disabled=true;try{var r=await fetch("/api/email/send",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({to:to,subject:subject,body:body})}),d=await r.json();if(!r.ok)throw Error(d.message||"Email send failed");toast("Email sent successfully");box.innerHTML="<div class='muted'>Email sent to "+esc(to)+"</div>";}catch(e){toast(e.message||e,true)}finally{this.disabled=false}}}
 document.getElementById("emailRefresh").onclick=render;document.getElementById("emailCompose").onclick=compose;render();
 };
-</script></body></html>
+</script></body></html>";
 async function apiHandler(req,url){
  const h={"content-type":"application/json; charset=utf-8","cache-control":"no-store"};
  if(url.pathname==="/api/ai/ask"&&req.method==="POST"){
