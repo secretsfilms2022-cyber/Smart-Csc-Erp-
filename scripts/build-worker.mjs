@@ -66,5 +66,14 @@ function repairUtf8Mojibake(value){
 const built = bootstrap + source;
 const residual = (built.match(/[\u00C3\u00C2\u00E2]/g) || []).length;
 console.log("UTF-8 repair residual marker count:", residual);
+if (residual) {
+  const samples = [];
+  const re = /[\u00C3\u00C2\u00E2]/g;
+  let m;
+  while ((m = re.exec(built)) && samples.length < 12) {
+    samples.push(built.slice(Math.max(0, m.index - 40), Math.min(built.length, m.index + 100)));
+  }
+  console.log("UTF-8 repair residual samples:", JSON.stringify(samples));
+}
 writeFileSync("dist-worker.js", built, "utf8");
 console.log("Built", parts.length, "parts with source-level UTF-8 repair,", built.length, "bytes");
