@@ -30,3 +30,26 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
+      - name: Production smoke test
+        run: |
+          node --input-type=module - <<'NODE'
+          const base = "https://smart-csc-erp.smartcscgorakhpur.workers.dev";
+          const health = await fetch(base + "/health", { cache: "no-store" });
+          if (!health.ok) throw new Error("Health check failed: HTTP " + health.status);
+          const healthJson = await health.json();
+          if (!healthJson.ok || healthJson.service !== "smart-csc-erp") {
+            throw new Error("Health check returned an unexpected payload");
+          }
+          const challenge = "ci-" + Date.now();
+          const webhook = await fetch(base + "/api/email/webhook", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ type: "verification", challenge })
+          });
+          if (!webhook.ok) throw new Error("Webhook verification smoke test failed: HTTP " + webhook.status);
+          const webhookJson = await webhook.json();
+          if (webhookJson.challenge !== challenge) {
+            throw new Error("Webhook verification challenge was not echoed");
+          }
+          console.log("Production smoke tests passed.");
+          NODE
