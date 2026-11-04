@@ -87,7 +87,7 @@ const MAIL_MODULE_JS = String.raw`
         "<div class='mail-layout'>"+
         "<aside class='mail-sidebar'><button class='btn mail-compose-side' id='mailCompose2'>+ Compose</button>"+
         ["inbox","starred","important","sent","draft","archive","trash"].map(function(f){return "<button class='mail-folder "+(mailState.folder===f?"active":"")+"' data-mail-folder='"+f+"'><span>"+({inbox:"✉",starred:"★",important:"!",sent:"↗",draft:"▣",archive:"▤",trash:"⌫"}[f])+"</span>"+mailFolderTitle(f)+"<em data-mail-count='"+f+"'></em></button>"}).join("")+
-        "<div class='mail-divider'></div><button class='mail-folder' id='mailTemplates'>▧ Templates</button><div class='mail-account'><b>Connected account</b><span>surajkatira@smartcsc.work.gd</span><small id='mailSyncStatus'>Sync status: checking…</small></div></aside>"+
+        "<div class='mail-divider'></div><button class='mail-folder' id='mailTemplates'>▧ Templates</button><div class='mail-account'><b>Connected account</b><span>helpline@smartcsc.work.gd</span><small id='mailSyncStatus'>Sync status: checking…</small></div></aside>"+
         "<section class='mail-main'><div class='mail-toolbar'><input id='mailSearch' placeholder='Search mail, sender, subject, customer, application...' value='"+mailEsc(mailState.search)+"'><button class='btn secondary' id='mailRefresh'>Refresh</button></div><div id='mailList'></div></section>"+
         "</div></div>";
       document.getElementById("main").innerHTML=h;
