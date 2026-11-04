@@ -100,6 +100,7 @@ async function atomicEmailHandler(req,url){
   return null;
  }catch(e){return new Response(JSON.stringify({ok:false,message:e&&e.message||"Atomic Mail request failed"}),{status:503,headers:{"content-type":"application/json","cache-control":"no-store"}})}
 }
-\nconst RENDER_HTML=repairUtf8Mojibake(HTML);
+`;
+const RENDER_HTML=repairUtf8Mojibake(HTML);
 addEventListener("fetch",function(ev){const u=new URL(ev.request.url);ev.respondWith((async function(){const e=await atomicEmailHandler(ev.request,u);if(e)return e;const a=await apiHandler(ev.request,u);if(a)return a;if(u.pathname==="/health")return new Response(JSON.stringify({ok:true,service:"smart-csc-erp",version:"erp-ui-11"}),{headers:{"content-type":"application/json","cache-control":"no-store"}});if(u.pathname==="/app.js"){try{return new Response(repairUtf8Mojibake(LOGIN_APP_JS),{headers:{"content-type":"application/javascript;charset=UTF-8","cache-control":"no-store, no-cache, must-revalidate, max-age=0"}})}catch(ex){console.error("APP_JS_ROUTE_FAILURE",ex&&ex.stack||ex);return new Response("APP_JS_ROUTE_FAILURE: "+String(ex&&ex.stack||ex),{status:500,headers:{"content-type":"text/plain;charset=UTF-8","cache-control":"no-store"}})}}return new Response(RENDER_HTML,{headers:{"content-type":"text/html;charset=UTF-8","cache-control":"no-store"}})})())});
 /* FACE_EMBEDDING_FIX_V5_1024_TO_128 */
