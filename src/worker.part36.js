@@ -17,11 +17,15 @@ const MAIL_MODULE_JS = String.raw`
     (customers.data||[]).forEach(function(x){cm[x.id]=x});
     var mm={};(mr.data||[]).forEach(function(x){if(x.communication_id)mm[x.communication_id]=x});
     mailState.meta=mr.data||[];
-    return (cr.data||[]).map(function(x){
+    var rows=(cr.data||[]).map(function(x){
       var m=mm[x.id]||{};
       var inferred=x.direction==="outbound"?"sent":"inbox";
       return Object.assign({},x,{_meta:m,_customer:cm[x.customer_id]||null,_folder:m.folder||inferred,_read:m.is_read!==false||inferred==="sent",_starred:!!m.is_starred,_important:!!m.is_important});
     });
+    (mr.data||[]).filter(function(m){return m.folder==="draft"&&!m.communication_id}).forEach(function(m){
+      rows.push({id:"draft:"+m.id,communication_id:null,provider_message_id:null,direction:"draft",sender_email:"surajkatira@smartcsc.work.gd",recipient_email:Array.isArray(m.draft_to)?m.draft_to.join(", "):"",subject:m.draft_subject||"(draft)",message:m.draft_body||"",thread_id:null,created_at:m.updated_at||m.created_at,_meta:m,_customer:null,_folder:"draft",_read:true,_starred:!!m.is_starred,_important:!!m.is_important});
+    });
+    return rows;
   }
   function mailMatches(r,q){
     if(!q)return true;
@@ -127,6 +131,10 @@ const MAIL_MODULE_JS = String.raw`
   }
   async function mailOpen(id){
     var r=mailState.rows.find(function(x){return x.id===id});if(!r)return;
+    if(r._folder==="draft"&&!r.communication_id){
+      mailCompose({title:"Edit Draft",to:Array.isArray(r._meta.draft_to)?r._meta.draft_to.join(", "):"",cc:Array.isArray(r._meta.draft_cc)?r._meta.draft_cc.join(", "):"",bcc:Array.isArray(r._meta.draft_bcc)?r._meta.draft_bcc.join(", "):"",subject:r._meta.draft_subject||"",body:r._meta.draft_body||""});
+      return;
+    }
     var detail=null;
     if(r.provider_message_id){var q=await api("/api/email/message?id="+encodeURIComponent(r.provider_message_id),{method:"GET"}).catch(function(){return{data:null}});detail=q.data&&q.data.message}
     if(detail&&r._folder==="inbox")await mailMarkRead(r,true);
