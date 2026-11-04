@@ -1,0 +1,9 @@
+{
+  "name": "smart-csc-erp",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build-worker.mjs",
+    "check": "npm run build && node --check dist-worker.js",
+    "deploy": "npm run build && npx wrangler@4 deploy"
+  }
+}
