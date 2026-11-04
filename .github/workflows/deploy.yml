@@ -46,6 +46,9 @@ jobs:
           if (!pageHtml.includes("Smart CSC Gorakhpur ERP")) {
             throw new Error("ERP page did not return the expected login shell");
           }
+          if (/[ÃÂâ]{2,}/.test(pageHtml)) {
+            throw new Error("ERP page still contains UTF-8 mojibake");
+          }
           const appJs = await fetch(base + "/app.js", { cache: "no-store" });
           if (!appJs.ok) throw new Error("ERP app.js check failed: HTTP " + appJs.status);
           const challenge = "ci-" + Date.now();
