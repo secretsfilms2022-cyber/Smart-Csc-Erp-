@@ -25,6 +25,41 @@ async function atomicMcpCall(toolName,args){
  if(data.error)throw new Error(data.error.message||"Atomic Mail MCP error");
  return data.result||data;
 }
+function b64Bytes(v){
+ const raw=atob(v);const out=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);return out;
+}
+async function verifyAtomicWebhook(req,raw,event){
+ const id=req.headers.get("webhook-id")||"",ts=req.headers.get("webhook-timestamp")||"",sig=req.headers.get("webhook-signature")||"";
+ const secret=typeof ATOMIC_MAIL_WEBHOOK_SECRET!=="undefined"?String(ATOMIC_MAIL_WEBHOOK_SECRET||""):"";
+ if(event&&event.type==="verification"&&!secret)return true;
+ if(!secret||!id||!ts||!sig)throw new Error("Webhook authentication is not configured");
+ const n=Number(ts);if(!/^\\d+$/.test(ts)||!Number.isFinite(n)||Math.abs(Math.floor(Date.now()/1000)-n)>300)throw new Error("Webhook timestamp outside tolerance");
+ const keyBytes=b64Bytes(secret.replace(/^whsec_/,""));
+ const key=await crypto.subtle.importKey("raw",keyBytes,{name:"HMAC",hash:"SHA-256"},false,["verify"]);
+ const data=new TextEncoder().encode(id+"."+ts+"."+raw);
+ const entries=sig.split(/\\s+/).filter(function(x){return x.indexOf("v1,")===0});
+ for(const entry of entries){try{if(await crypto.subtle.verify("HMAC",key,b64Bytes(entry.slice(3)),data))return true}catch(e){}}
+ throw new Error("Invalid webhook signature");
+}
+async function atomicWebhookHandler(req){
+ const raw=await req.text();let event=null;try{event=JSON.parse(raw)}catch(e){return new Response("Invalid JSON",{status:400})}
+ if(!event||typeof event!=="object"||Array.isArray(event))return new Response("Invalid event",{status:400});
+ if(event.type==="verification"){
+  try{await verifyAtomicWebhook(req,raw,event);return new Response(JSON.stringify({challenge:String(event.challenge||"")}),{status:200,headers:{"content-type":"application/json"}})}catch(e){return new Response("Unauthorized",{status:401})}
+ }
+ try{await verifyAtomicWebhook(req,raw,event)}catch(e){return new Response("Unauthorized",{status:401})}
+ if(event.type!=="message.received")return new Response(null,{status:204});
+ const d=event.data||{},messageId=String(d.message_id||"");if(!messageId)return new Response(null,{status:204});
+ const existing=await fetch(SB+"/rest/v1/customer_communications?business_id=eq."+encodeURIComponent(BIZ)+"&provider=eq.atomicmail&provider_message_id=eq."+encodeURIComponent(messageId)+"&select=id&limit=1",{headers:{apikey:KEY}}).then(function(x){return x.json().catch(function(){return[]})});
+ if(existing&&existing.length)return new Response(null,{status:204});
+ const full=await atomicMcpCall("read_message",{message_id:messageId});
+ const from=full&&full.from&&full.from[0]&&full.from[0].email||d.from&&d.from[0]&&d.from[0].email||"";
+ const to=full&&full.to&&full.to[0]&&full.to[0].email||"surajkatira@smartcsc.work.gd";
+ const ah={apikey:KEY,Authorization:"Bearer "+KEY,"Content-Type":"application/json"};
+ const cr=await fetch(SB+"/rest/v1/customers?business_id=eq."+encodeURIComponent(BIZ)+"&email=ilike."+encodeURIComponent(from)+"&select=id,full_name,email&limit=1",{headers:{apikey:KEY}});const cs=await cr.json().catch(function(){return[]});const c=cs&&cs[0]||null;
+ await fetch(SB+"/rest/v1/customer_communications",{method:"POST",headers:Object.assign({},ah,{Prefer:"return=minimal"}),body:JSON.stringify({business_id:BIZ,customer_id:c&&c.id||null,channel:"email",message_type:"email",recipient_name:c&&c.full_name||from||"Email contact",recipient_mobile:null,message:String(full&&full.body||""),status:"received",related_type:"email",related_id:null,opened_at:null,sent_at:null,created_by:null,provider:"atomicmail",provider_message_id:messageId,thread_id:full&&full.threadId||d.thread_id||null,direction:"inbound",sender_email:from,recipient_email:to,subject:String(full&&full.subject||""),provider_status:"received",received_at:full&&full.receivedAt||d.received_at||null})});
+ return new Response(null,{status:204});
+}
 async function atomicAuth(req){
  const authz=req.headers.get("Authorization")||"";
  if(!/^Bearer\s+\S+$/i.test(authz))return null;
@@ -67,7 +102,7 @@ async function atomicEmailSync(session){
  await atomicSB(session,"/rest/v1/email_sync_state?on_conflict=business_id",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(state)});
  return {scanned,imported,last_received_at:lastReceived,last_message_id:lastMessageId,synced_at:now};
 }
-async function atomicEmailHandler(req,url){
+if(url.pathname==="/api/email/webhook"&&req.method==="POST")return await atomicWebhookHandler(req);\nasync function atomicEmailHandler(req,url){
  const session=await atomicAuth(req);
  if(!session)return new Response(JSON.stringify({message:"Unauthorized"}),{status:401,headers:{"content-type":"application/json","cache-control":"no-store"}});
  try{
