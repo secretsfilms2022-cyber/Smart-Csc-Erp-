@@ -106,7 +106,8 @@ const DOM_MOJIBAKE_REPAIR_SCRIPT = `
 
 const repairedParts = parts.map((name) => repairSourceLiterals(readFileSync(join(dir,name),"utf8")));
 const source = repairedParts.join("");
-const built = bootstrap + source;
+const runtimeBootstrap = bootstrap + "\nconst DOM_MOJIBAKE_REPAIR_SCRIPT = " + JSON.stringify(DOM_MOJIBAKE_REPAIR_SCRIPT) + ";\n";
+const built = runtimeBootstrap + source;
 const finalSource = built.replace(
   'return new Response(repairUtf8Mojibake(LOGIN_APP_JS),',
   'return new Response(repairUtf8Mojibake(LOGIN_APP_JS)+DOM_MOJIBAKE_REPAIR_SCRIPT,'
