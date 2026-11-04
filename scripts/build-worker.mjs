@@ -7,18 +7,25 @@ const parts = readdirSync(dir)
   .sort((a,b) => Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0]));
 if (!parts.length) throw new Error("No worker source parts found");
 
+// Runtime repair for legacy strings that were UTF-8 -> Latin-1 corrupted
+// multiple times. Some existing ERP labels were corrupted 4+ generations deep.
+// Decode only while the string still contains recognizable mojibake markers.
 const bootstrap = `function repairUtf8Mojibake(value){
  const source=String(value==null?"":value);
  let out=source;
- for(let pass=0;pass<3;pass++){
-  if(!/[ÃÂâ]/.test(out))break;
+ for(let pass=0;pass<8;pass++){
+  if(!/[ÃÂâ]/.test(out)) break;
   try{
    const bytes=new Uint8Array(out.length);
    let ok=true;
-   for(let i=0;i<out.length;i++){const code=out.charCodeAt(i);if(code>255){ok=false;break}bytes[i]=code}
-   if(!ok)break;
+   for(let i=0;i<out.length;i++){
+    const code=out.charCodeAt(i);
+    if(code>255){ok=false;break}
+    bytes[i]=code;
+   }
+   if(!ok) break;
    const decoded=new TextDecoder("utf-8",{fatal:true}).decode(bytes);
-   if(decoded===out)break;
+   if(decoded===out) break;
    out=decoded;
   }catch(e){break}
  }
@@ -28,4 +35,4 @@ const bootstrap = `function repairUtf8Mojibake(value){
 
 const source = bootstrap + parts.map((name) => readFileSync(join(dir,name),"utf8")).join("");
 writeFileSync("dist-worker.js", source, "utf8");
-console.log("Built", parts.length, "parts + bootstrap,", source.length, "bytes");
+console.log("Built", parts.length, "parts + robust UTF-8 mojibake repair,", source.length, "bytes");
