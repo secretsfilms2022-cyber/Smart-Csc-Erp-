@@ -112,5 +112,6 @@ const finalSource = built.replace(
   'return new Response(repairUtf8Mojibake(LOGIN_APP_JS),',
   'return new Response(repairUtf8Mojibake(LOGIN_APP_JS)+DOM_MOJIBAKE_REPAIR_SCRIPT,'
 );
+if (!finalSource.includes("MAIL_MODULE_V1") || !finalSource.includes("window.mailPage=mailPage")) throw new Error("MAIL_MODULE_BUILD_ASSERTION_FAILED: Mail module was not included in dist-worker.js");
 writeFileSync("dist-worker.js", finalSource, "utf8");
 console.log("Built", parts.length, "parts with source-literal + runtime + DOM UTF-8 repair,", finalSource.length, "bytes");
