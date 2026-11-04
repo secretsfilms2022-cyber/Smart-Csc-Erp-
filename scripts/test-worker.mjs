@@ -10,7 +10,10 @@ const required = [
   "/api/email/send",
   "/api/email/reply",
   "/api/email/sync",
+  "/api/email/webhook",
   "/api/email/templates",
+  "/health",
+  "ATOMIC_MAIL_WEBHOOK_SECRET",
   "customer_communications",
   "surajkatira@smartcsc.work.gd"
 ];
@@ -23,5 +26,10 @@ if (/8fad7d9b-5609-4d14-b81d-5047cf01f41b/.test(source)) {
 }
 if (/CLOUDFLARE_API_TOKEN\s*=\s*["'][^"']+["']/.test(source)) {
   throw new Error("Exposed Cloudflare credential detected");
+}
+
+const duplicateAtomicMcpCall = (source.match(/async function atomicMcpCall\(/g) || []).length;
+if (duplicateAtomicMcpCall !== 1) {
+  throw new Error("Worker integrity check failed; expected exactly one atomicMcpCall definition, found " + duplicateAtomicMcpCall);
 }
 console.log("Worker integrity tests passed:", required.length, "required markers verified.");
