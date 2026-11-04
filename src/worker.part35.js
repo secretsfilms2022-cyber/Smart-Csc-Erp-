@@ -45,7 +45,13 @@ async function atomicWebhookHandler(req){
  const raw=await req.text();let event=null;try{event=JSON.parse(raw)}catch(e){return new Response("Invalid JSON",{status:400})}
  if(!event||typeof event!=="object"||Array.isArray(event))return new Response("Invalid event",{status:400});
  if(event.type==="verification"){
-  try{await verifyAtomicWebhook(req,raw,event);return new Response(JSON.stringify({challenge:String(event.challenge||"")}),{status:200,headers:{"content-type":"application/json"}})}catch(e){return new Response("Unauthorized",{status:401})}
+  try{
+   const hasSecret=typeof ATOMIC_MAIL_WEBHOOK_SECRET!=="undefined"&&String(ATOMIC_MAIL_WEBHOOK_SECRET||"");
+   if(hasSecret)await verifyAtomicWebhook(req,raw,event);
+   const challenge=event.challenge;
+   if(typeof challenge!=="string"||!challenge)return new Response(JSON.stringify({message:"Invalid verification challenge"}),{status:400,headers:{"content-type":"application/json"}});
+   return new Response(JSON.stringify({challenge}),{status:200,headers:{"content-type":"application/json","cache-control":"no-store"}});
+  }catch(e){return new Response(JSON.stringify({message:"Unauthorized"}),{status:401,headers:{"content-type":"application/json","cache-control":"no-store"})}
  }
  try{await verifyAtomicWebhook(req,raw,event)}catch(e){return new Response("Unauthorized",{status:401})}
  if(event.type!=="message.received")return new Response(null,{status:204});
