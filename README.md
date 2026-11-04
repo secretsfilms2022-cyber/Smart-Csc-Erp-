@@ -60,3 +60,7 @@ GitHub Actions deployment still requires repository secrets:
 - `CLOUDFLARE_ACCOUNT_ID`
 
 The recovered Worker source contained missing delimiters/newline damage in the recovered monolithic source. These have been repaired in GitHub; the assembled 300 KB Worker now passes a Node parser check and the integrity suite checks the Atomic Mail routes and exposed-secret guardrails. Atomic Mail webhook ingestion is implemented but requires the two server-only secrets above plus dashboard endpoint verification. A successful GitHub Actions run and Cloudflare deployment are still required before production completion can be declared.
+
+## Cloudflare Git integration
+
+Production Cloudflare Builds is connected to `secretsfilms2022-cyber/Smart-Csc-Erp-` on the `main` branch with `npm run build` followed by `npx wrangler deploy`.
