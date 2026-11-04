@@ -41,30 +41,34 @@ async function verifyAtomicWebhook(req,raw,event){
  for(const entry of entries){try{if(await crypto.subtle.verify("HMAC",key,b64Bytes(entry.slice(3)),data))return true}catch(e){}}
  throw new Error("Invalid webhook signature");
 }
-async function atomicWebhookHandler(req){
+async function atomicWebhookHandler(req,ctx){
  const raw=await req.text();let event=null;try{event=JSON.parse(raw)}catch(e){return new Response("Invalid JSON",{status:400})}
  if(!event||typeof event!=="object"||Array.isArray(event))return new Response("Invalid event",{status:400});
  if(event.type==="verification"){
-  try{
-   // Atomic Mail's initial endpoint verification must be answered with the
-   // challenge before delivery signing is enforced. Signature verification
-   // applies to subsequent message.received deliveries.
-   const challenge=event.challenge;
-   if(typeof challenge!=="string"||!challenge)return new Response(JSON.stringify({message:"Invalid verification challenge"}),{status:400,headers:{"content-type":"application/json"}});
-   return new Response(JSON.stringify({challenge}),{status:200,headers:{"content-type":"application/json","cache-control":"no-store"}});
-  }catch(e){return new Response(JSON.stringify({message:"Unauthorized"}),{status:401,headers:{"content-type":"application/json","cache-control":"no-store"})}
+  const challenge=event.challenge;
+  if(typeof challenge!=="string"||!challenge)return new Response(JSON.stringify({message:"Invalid verification challenge"}),{status:400,headers:{"content-type":"application/json"}});
+  return new Response(JSON.stringify({challenge}),{status:200,headers:{"content-type":"application/json","cache-control":"no-store"}});
  }
  try{await verifyAtomicWebhook(req,raw,event)}catch(e){return new Response("Unauthorized",{status:401})}
  if(event.type!=="message.received")return new Response(null,{status:204});
- const d=event.data||{},messageId=String(d.message_id||"");if(!messageId)return new Response(null,{status:204});
- const systemKey=typeof SUPABASE_SECRET_KEY!=="undefined"?String(SUPABASE_SECRET_KEY||""):KEY;const existing=await fetch(SB+"/rest/v1/customer_communications?business_id=eq."+encodeURIComponent(BIZ)+"&provider=eq.atomicmail&provider_message_id=eq."+encodeURIComponent(messageId)+"&select=id&limit=1",{headers:{apikey:systemKey}}).then(function(x){return x.json().catch(function(){return[]})});
- if(existing&&existing.length)return new Response(null,{status:204});
- const full=await atomicMcpCall("read_message",{message_id:messageId});
- const from=full&&full.from&&full.from[0]&&full.from[0].email||d.from&&d.from[0]&&d.from[0].email||"";
- const to=full&&full.to&&full.to[0]&&full.to[0].email||"surajkatira@smartcsc.work.gd";
- const ah={apikey:systemKey,"Content-Type":"application/json"};
- const cr=await fetch(SB+"/rest/v1/customers?business_id=eq."+encodeURIComponent(BIZ)+"&email=ilike."+encodeURIComponent(from)+"&select=id,full_name,email&limit=1",{headers:{apikey:systemKey}});const cs=await cr.json().catch(function(){return[]});const c=cs&&cs[0]||null;
- await fetch(SB+"/rest/v1/customer_communications",{method:"POST",headers:Object.assign({},ah,{Prefer:"return=minimal"}),body:JSON.stringify({business_id:BIZ,customer_id:c&&c.id||null,channel:"email",message_type:"email",recipient_name:c&&c.full_name||from||"Email contact",recipient_mobile:null,message:String(full&&full.body||""),status:"received",related_type:"email",related_id:null,opened_at:null,sent_at:null,created_by:null,provider:"atomicmail",provider_message_id:messageId,thread_id:full&&full.threadId||d.thread_id||null,direction:"inbound",sender_email:from,recipient_email:to,subject:String(full&&full.subject||""),provider_status:"received",received_at:full&&full.receivedAt||d.received_at||null})});
+ const d=event.data||{},messageId=String(d.message_id||"");
+ if(!messageId)return new Response(null,{status:204});
+ const process=async function(){
+  try{
+   const systemKey=typeof SUPABASE_SECRET_KEY!=="undefined"?String(SUPABASE_SECRET_KEY||""):KEY;
+   const existing=await fetch(SB+"/rest/v1/customer_communications?business_id=eq."+encodeURIComponent(BIZ)+"&provider=eq.atomicmail&provider_message_id=eq."+encodeURIComponent(messageId)+"&select=id&limit=1",{headers:{apikey:systemKey}}).then(function(x){return x.json().catch(function(){return[]})});
+   if(existing&&existing.length)return;
+   const full=await atomicMcpCall("read_message",{message_id:messageId});
+   const from=full&&full.from&&full.from[0]&&full.from[0].email||d.from&&d.from[0]&&d.from[0].email||"";
+   const to=full&&full.to&&full.to[0]&&full.to[0].email||"surajkatira@smartcsc.work.gd";
+   const ah={apikey:systemKey,"Content-Type":"application/json"};
+   const cr=await fetch(SB+"/rest/v1/customers?business_id=eq."+encodeURIComponent(BIZ)+"&email=ilike."+encodeURIComponent(from)+"&select=id,full_name,email&limit=1",{headers:{apikey:systemKey}});
+   const cs=await cr.json().catch(function(){return[]});const c=cs&&cs[0]||null;
+   const ins=await fetch(SB+"/rest/v1/customer_communications",{method:"POST",headers:Object.assign({},ah,{Prefer:"return=minimal"}),body:JSON.stringify({business_id:BIZ,customer_id:c&&c.id||null,channel:"email",message_type:"email",recipient_name:c&&c.full_name||from||"Email contact",recipient_mobile:null,message:String(full&&full.body||""),status:"received",related_type:"email",related_id:null,opened_at:null,sent_at:null,created_by:null,provider:"atomicmail",provider_message_id:messageId,thread_id:full&&full.threadId||d.thread_id||null,direction:"inbound",sender_email:from,recipient_email:to,subject:String(full&&full.subject||""),provider_status:"received",received_at:full&&full.receivedAt||d.received_at||null})});
+   if(!ins.ok)console.error("ATOMIC_MAIL_WEBHOOK_DB_INSERT_FAILED",await ins.text().catch(function(){return""}));
+  }catch(e){console.error("ATOMIC_MAIL_WEBHOOK_PROCESSING_FAILED",e&&e.stack||e)}
+ };
+ if(ctx&&typeof ctx.waitUntil==="function")ctx.waitUntil(process());else process();
  return new Response(null,{status:204});
 }
 async function atomicAuth(req){
