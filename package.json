@@ -6,5 +6,6 @@
     "check": "npm run build && node scripts/test-worker.mjs && node --check dist-worker.js",
     "deploy": "npm run build && npx wrangler@4 deploy",
     "test": "npm run build && node scripts/test-worker.mjs && node --check dist-worker.js"
-  }
+  },
+  "type": "module"
 }
