@@ -14,7 +14,7 @@ if (!parts.length) throw new Error("No worker source parts found");
 function repairUtf8Mojibake(value) {
   let out = String(value ?? "");
   for (let pass = 0; pass < 12; pass++) {
-    if (!/[ÃÂâ]/.test(out)) break;
+    if (!/[\u00C3\u00C2\u00E2]/.test(out)) break;
     try {
       const bytes = new Uint8Array(out.length);
       let valid = true;
@@ -44,7 +44,7 @@ const bootstrap = `
 function repairUtf8Mojibake(value){
   let out=String(value==null?"":value);
   for(let pass=0;pass<12;pass++){
-    if(!/[ÃÂâ]/.test(out)) break;
+    if(!/[\u00C3\u00C2\u00E2]/.test(out)) break;
     try{
       const bytes=new Uint8Array(out.length);
       let valid=true;
@@ -64,7 +64,7 @@ function repairUtf8Mojibake(value){
 `;
 
 const built = bootstrap + source;
-if (/[ÃÂ]{2,}/.test(built)) {
+if (/[\u00C3\u00C2]{2,}/.test(built)) {
   throw new Error("Build still contains UTF-8 mojibake markers");
 }
 writeFileSync("dist-worker.js", built, "utf8");
