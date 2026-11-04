@@ -25,12 +25,65 @@ async function atomicMcpCall(toolName,args){
  if(data.error)throw new Error(data.error.message||"Atomic Mail MCP error");
  return data.result||data;
 }
-async function atomicEmailHandler(req,url){
+async function atomicAuth(req){
  const authz=req.headers.get("Authorization")||"";
- if(!authz)return new Response(JSON.stringify({message:"No session"}),{status:401,headers:{"content-type":"application/json","cache-control":"no-store"}});
+ if(!/^Bearer\\s+\\S+$/i.test(authz))return null;
+ const ur=await fetch(SB+"/auth/v1/user",{headers:{apikey:KEY,Authorization:authz}});
+ if(!ur.ok)return null;
+ const user=await ur.json().catch(function(){return null});
+ if(!user||!user.id)return null;
+ const pr=await fetch(SB+"/rest/v1/profiles?id=eq."+encodeURIComponent(user.id)+"&select=id,business_id,full_name&limit=1",{headers:{apikey:KEY,Authorization:authz}});
+ if(!pr.ok)return null;
+ const profile=(await pr.json().catch(function(){return[]}))[0];
+ if(!profile||!profile.business_id)return null;
+ return {authz,user,profile};
+}
+async function atomicSB(session,path,options){
+ const headers=Object.assign({apikey:KEY,Authorization:session.authz,"Content-Type":"application/json"},(options&&options.headers)||{});
+ return fetch(SB+path,Object.assign({},options||{},{headers}));
+}
+async function atomicEmailSync(session){
+ const now=new Date().toISOString();
+ const inbox=await atomicMcpCall("read_inbox",{limit:50});
+ const messages=inbox.messages||inbox||[];
+ let imported=0,scanned=0,lastReceived=null,lastMessageId=null;
+ for(const m of messages){
+  scanned++;
+  if(m.receivedAt&&(!lastReceived||m.receivedAt>lastReceived)){lastReceived=m.receivedAt;lastMessageId=m.id||null;}
+  if(!m.id)continue;
+  const exists=await atomicSB(session,"/rest/v1/customer_communications?business_id=eq."+encodeURIComponent(session.profile.business_id)+"&provider=eq.atomicmail&provider_message_id=eq."+encodeURIComponent(m.id)+"&select=id&limit=1").then(function(x){return x.json().catch(function(){return[]})});
+  if(exists&&exists.length)continue;
+  const full=await atomicMcpCall("read_message",{message_id:m.id});
+  const from=full&&full.from&&full.from[0]&&full.from[0].email||m.from&&m.from[0]&&m.from[0].email||"";
+  const to=full&&full.to&&full.to[0]&&full.to[0].email||"surajkatira@smartcsc.work.gd";
+  const cq="/rest/v1/customers?business_id=eq."+encodeURIComponent(session.profile.business_id)+"&email=ilike."+encodeURIComponent(from)+"&select=id,full_name,email&limit=2";
+  const cr=await atomicSB(session,cq); const customers=await cr.json().catch(function(){return[]});
+  const customer=customers&&customers[0]||null;
+  const payload={business_id:session.profile.business_id,customer_id:customer&&customer.id||null,channel:"email",message_type:"email",recipient_name:customer&&customer.full_name||from||"Email contact",recipient_mobile:null,message:String(full&&full.body||m.preview||""),status:"received",related_type:"email",related_id:null,opened_at:null,sent_at:null,created_by:session.user.id,provider:"atomicmail",provider_message_id:m.id,thread_id:full&&full.threadId||null,direction:"inbound",sender_email:from,recipient_email:to,subject:String(full&&full.subject||m.subject||""),provider_status:"received",received_at:full&&full.receivedAt||m.receivedAt||now};
+  const ir=await atomicSB(session,"/rest/v1/customer_communications",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify(payload)});
+  if(ir.ok)imported++;
+ }
+ const state={business_id:session.profile.business_id,provider:"atomicmail",mailbox:"surajkatira@smartcsc.work.gd",last_sync_at:now,last_received_at:lastReceived,last_message_id:lastMessageId,last_error:null,sync_status:"success",messages_scanned:scanned,messages_imported:imported,updated_at:now};
+ await atomicSB(session,"/rest/v1/email_sync_state?on_conflict=business_id",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(state)});
+ return {scanned,imported,last_received_at:lastReceived,last_message_id:lastMessageId,synced_at:now};
+}
+async function atomicEmailHandler(req,url){
+ const session=await atomicAuth(req);
+ if(!session)return new Response(JSON.stringify({message:"Unauthorized"}),{status:401,headers:{"content-type":"application/json","cache-control":"no-store"}});
  try{
   if(url.pathname==="/api/email/status"&&req.method==="GET"){
    const r=await atomicMcpCall("list_agents",{});return new Response(JSON.stringify({ok:true,provider:"Atomic Mail",mailbox:"surajkatira@smartcsc.work.gd",agents:r}),{headers:{"content-type":"application/json","cache-control":"no-store"}});
+  }
+  if(url.pathname==="/api/email/sync"&&req.method==="POST"){
+   try{const result=await atomicEmailSync(session);return new Response(JSON.stringify({ok:true,result}),{headers:{"content-type":"application/json","cache-control":"no-store"}})}catch(e){return new Response(JSON.stringify({ok:false,message:"Email sync failed"}),{status:503,headers:{"content-type":"application/json","cache-control":"no-store"}})}
+  }
+  if(url.pathname==="/api/email/templates"&&req.method==="GET"){
+   const r=await atomicSB(session,"/rest/v1/email_templates?business_id=eq."+encodeURIComponent(session.profile.business_id)+"&select=id,template_key,name,subject_template,body_template,enabled&order=template_key.asc");const data=await r.json().catch(function(){return[]});return new Response(JSON.stringify({ok:r.ok,templates:data}),{status:r.ok?200:502,headers:{"content-type":"application/json","cache-control":"no-store"}});
+  }
+  if(url.pathname==="/api/email/templates"&&req.method==="PATCH"){
+   const b=await req.json().catch(function(){return{}}),id=String(b.id||"");if(!id)return new Response(JSON.stringify({message:"Template id is required"}),{status:400,headers:{"content-type":"application/json"}});
+   const allowed={name:String(b.name||"").slice(0,120),subject_template:String(b.subject_template||"").slice(0,300),body_template:String(b.body_template||"").slice(0,20000),enabled:b.enabled!==false,updated_by:session.user.id,updated_at:new Date().toISOString()};
+   const r=await atomicSB(session,"/rest/v1/email_templates?id=eq."+encodeURIComponent(id)+"&business_id=eq."+encodeURIComponent(session.profile.business_id),{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify(allowed)});if(!r.ok)return new Response(JSON.stringify({message:"Unable to update template"}),{status:502,headers:{"content-type":"application/json"}});return new Response(JSON.stringify({ok:true}),{headers:{"content-type":"application/json","cache-control":"no-store"}});
   }
   if(url.pathname==="/api/email/inbox"&&req.method==="GET"){
    const limit=Math.min(50,Math.max(1,Number(url.searchParams.get("limit")||25)));const r=await atomicMcpCall("read_inbox",{limit});return new Response(JSON.stringify({ok:true,messages:r.messages||r}),{headers:{"content-type":"application/json","cache-control":"no-store"}});
