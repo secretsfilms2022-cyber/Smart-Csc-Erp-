@@ -27,7 +27,7 @@ async function atomicMcpCall(toolName,args){
 }
 async function atomicAuth(req){
  const authz=req.headers.get("Authorization")||"";
- if(!/^Bearer\\s+\\S+$/i.test(authz))return null;
+ if(!/^Bearer\s+\S+$/i.test(authz))return null;
  const ur=await fetch(SB+"/auth/v1/user",{headers:{apikey:KEY,Authorization:authz}});
  if(!ur.ok)return null;
  const user=await ur.json().catch(function(){return null});
