@@ -1,0 +1,6 @@
+name = "smart-csc-erp"
+main = "dist-worker.js"
+compatibility_date = "2026-10-28"
+
+[observability]
+enabled = true
