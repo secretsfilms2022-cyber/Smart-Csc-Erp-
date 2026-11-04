@@ -46,8 +46,9 @@ async function atomicWebhookHandler(req){
  if(!event||typeof event!=="object"||Array.isArray(event))return new Response("Invalid event",{status:400});
  if(event.type==="verification"){
   try{
-   const hasSecret=typeof ATOMIC_MAIL_WEBHOOK_SECRET!=="undefined"&&String(ATOMIC_MAIL_WEBHOOK_SECRET||"");
-   if(hasSecret)await verifyAtomicWebhook(req,raw,event);
+   // Atomic Mail's initial endpoint verification must be answered with the
+   // challenge before delivery signing is enforced. Signature verification
+   // applies to subsequent message.received deliveries.
    const challenge=event.challenge;
    if(typeof challenge!=="string"||!challenge)return new Response(JSON.stringify({message:"Invalid verification challenge"}),{status:400,headers:{"content-type":"application/json"}});
    return new Response(JSON.stringify({challenge}),{status:200,headers:{"content-type":"application/json","cache-control":"no-store"}});
