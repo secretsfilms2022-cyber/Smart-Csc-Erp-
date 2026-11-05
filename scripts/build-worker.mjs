@@ -108,10 +108,26 @@ const repairedParts = parts.map((name) => repairSourceLiterals(readFileSync(join
 const source = repairedParts.join("");
 const runtimeBootstrap = bootstrap + "\nconst DOM_MOJIBAKE_REPAIR_SCRIPT = " + JSON.stringify(DOM_MOJIBAKE_REPAIR_SCRIPT) + ";\n";
 const built = runtimeBootstrap + source;
-const finalSource = built.replace(
+let finalSource = built.replace(
   'return new Response(repairUtf8Mojibake(LOGIN_APP_JS),',
   'return new Response(repairUtf8Mojibake(LOGIN_APP_JS)+DOM_MOJIBAKE_REPAIR_SCRIPT,'
 );
-if (!finalSource.includes("MAIL_MODULE_V1") || !finalSource.includes("window.mailPage=mailPage")) throw new Error("MAIL_MODULE_BUILD_ASSERTION_FAILED: Mail module was not included in dist-worker.js");
+
+// Defensive repair for the generated APP_JS literal. Some source-part boundaries can
+// leave the terminal quote out of the assembled browser bundle; never ship that.
+const appJsClose = "\\n})();\\nconst BULK_PATCH=\\\"\\\";";
+const appJsCloseFixed = "\\n})();\\\";\\nconst BULK_PATCH=\\\"\\\";";
+if (finalSource.includes(appJsClose)) {
+  finalSource = finalSource.replace(appJsClose, appJsCloseFixed);
+}
+
+if (!finalSource.includes("MAIL_MODULE_V1") || !finalSource.includes("window.mailPage=mailPage")) {
+  throw new Error("MAIL_MODULE_BUILD_ASSERTION_FAILED: Mail module was not included in dist-worker.js");
+}
+try {
+  new Function(finalSource);
+} catch (error) {
+  throw new Error("WORKER_SYNTAX_CHECK_FAILED: " + (error?.message || error));
+}
 writeFileSync("dist-worker.js", finalSource, "utf8");
 console.log("Built", parts.length, "parts with source-literal + runtime + DOM UTF-8 repair,", finalSource.length, "bytes");
