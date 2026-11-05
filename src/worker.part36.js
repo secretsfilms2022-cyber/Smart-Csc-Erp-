@@ -172,6 +172,91 @@ const MAIL_MODULE_JS = String.raw`
   function mailOptions(a,label){
     return "<option value=''>"+label+"</option>"+a.map(function(x){return "<option value='"+mailEsc(x.id)+"'>"+mailEsc(x.full_name||x.application_no||x.email||x.id)+"</option>"}).join("");
   }
+  async function mailApplyTemplate(template){
+    if(!template)return;
+    var values={
+      customer_name:"",
+      customer_email:"",
+      customer_mobile:"",
+      application_number:"",
+      application_status:"",
+      application_date:"",
+      due_date:"",
+      government_reference_no:"",
+      service_name:"",
+      service_fee:"",
+      amount_paid:"",
+      balance:"",
+      payment_status:"",
+      payment_method:"",
+      date:new Date().toLocaleDateString("en-IN"),
+      payment_date:new Date().toLocaleDateString("en-IN"),
+      business_name:"",
+      business_phone:"",
+      business_email:"",
+      business_address:"",
+      business_city:"",
+      business_district:"",
+      business_state:"",
+      business_pincode:"",
+      message:"",
+      invoice_number:"",
+      total_amount:"",
+      paid_amount:"",
+      pending_amount:"",
+      invoice_link:"",
+      quotation_number:"",
+      quotation_valid_until:"",
+      quotation_link:"",
+      payment_amount:"",
+      payment_method:""
+    };
+    try{
+      var b=await api("/rest/v1/businesses?id=eq."+encodeURIComponent(BIZ)+"&select=name,phone,email,address,city,district,state,pincode&limit=1");
+      var bd=(b.data&&b.data[0])||{};
+      Object.keys(bd).forEach(function(k){if(k==="name")values.business_name=bd[k]||"";else values["business_"+k]=bd[k]||""});
+      var cid=document.getElementById("mailCustomer").value||"";
+      if(cid){
+        var c=await api("/rest/v1/customers?id=eq."+encodeURIComponent(cid)+"&business_id=eq."+encodeURIComponent(BIZ)+"&select=full_name,email,mobile&limit=1");
+        var cd=(c.data&&c.data[0])||{};
+        values.customer_name=cd.full_name||"";
+        values.customer_email=cd.email||"";
+        values.customer_mobile=cd.mobile||"";
+      }
+      var aid=document.getElementById("mailApplication").value||"";
+      if(aid){
+        var a=await api("/rest/v1/applications?id=eq."+encodeURIComponent(aid)+"&business_id=eq."+encodeURIComponent(BIZ)+"&select=application_no,application_date,due_date,status,government_reference_no,service_fee,amount_paid,balance,payment_status,payment_method,customer_id,service_id&limit=1");
+        var ad=(a.data&&a.data[0])||{};
+        values.application_number=ad.application_no||"";
+        values.application_status=ad.status||"";
+        values.application_date=ad.application_date||values.date;
+        values.due_date=ad.due_date||"";
+        values.government_reference_no=ad.government_reference_no||"";
+        values.service_fee=ad.service_fee==null?"":ad.service_fee;
+        values.amount_paid=ad.amount_paid==null?"":ad.amount_paid;
+        values.balance=ad.balance==null?"":ad.balance;
+        values.pending_amount=ad.balance==null?"":ad.balance;
+        values.payment_status=ad.payment_status||"";
+        values.payment_method=ad.payment_method||"";
+        if(!values.customer_name&&ad.customer_id){
+          var c2=await api("/rest/v1/customers?id=eq."+encodeURIComponent(ad.customer_id)+"&business_id=eq."+encodeURIComponent(BIZ)+"&select=full_name,email,mobile&limit=1");
+          var cd2=(c2.data&&c2.data[0])||{};
+          values.customer_name=cd2.full_name||"";
+          values.customer_email=cd2.email||"";
+          values.customer_mobile=cd2.mobile||"";
+        }
+        if(ad.service_id){
+          var s=await api("/rest/v1/services?id=eq."+encodeURIComponent(ad.service_id)+"&business_id=eq."+encodeURIComponent(BIZ)+"&select=name,price&limit=1");
+          var sd=(s.data&&s.data[0])||{};
+          values.service_name=sd.name||"";
+          if(values.service_fee==="")values.service_fee=sd.price==null?"":sd.price;
+        }
+      }
+    }catch(e){console.warn("MAIL_TEMPLATE_CONTEXT_FAILED",e)}
+    var render=function(v){return String(v==null?"":v).replace(/\\n/g,"\\n").replace(/{{\\s*([a-zA-Z0-9_]+)\\s*}}/g,function(_,k){return values[k]==null?"":String(values[k])})};
+    document.getElementById("mailSubject").value=render(template.subject_template||"");
+    document.getElementById("mailBody").value=render(template.body_template||"");
+  }
   async function mailCompose(seed){
     var ct=await mailContacts();
     var s=seed||{};
@@ -180,7 +265,7 @@ const MAIL_MODULE_JS = String.raw`
     openModal(seed&&seed.title||"Compose Email",body);
     document.getElementById("mailCancel").onclick=closeModal;
     document.getElementById("mailCustomer").onchange=function(){var c=ct.customers.find(function(x){return x.id===this.value}.bind(this));if(c){document.getElementById("mailTo").value=c.email||""}};
-    document.getElementById("mailTemplate").onchange=function(){var t=tpl.find(function(x){return x.id===this.value}.bind(this));if(t){document.getElementById("mailSubject").value=t.subject_template||"";document.getElementById("mailBody").value=t.body_template||""}};
+    document.getElementById("mailTemplate").onchange=async function(){var t=tpl.find(function(x){return x.id===this.value}.bind(this));if(t)await mailApplyTemplate(t)};
     document.getElementById("mailDraft").onclick=function(){mailSaveDraft()};
     document.getElementById("mailComposeForm").onsubmit=function(e){e.preventDefault();mailSend()};
     if(s.customer_id)document.getElementById("mailCustomer").value=s.customer_id;
@@ -196,7 +281,7 @@ const MAIL_MODULE_JS = String.raw`
     var b=document.querySelector("#mailComposeForm button[type=submit]");if(b){b.disabled=true;b.textContent="Sending…"}
     try{
       var files=await mailFiles(),to=splitEmails(document.getElementById("mailTo").value),cc=splitEmails(document.getElementById("mailCc").value),bcc=splitEmails(document.getElementById("mailBcc").value),subject=document.getElementById("mailSubject").value.trim(),body=document.getElementById("mailBody").value,customer=document.getElementById("mailCustomer").value||null,application=document.getElementById("mailApplication").value||null;
-      if(!to.length)throw Error("Enter at least one recipient");
+      if(!to.length)throw Error("Enter at least one recipient");\n      if(/{{\\s*[a-zA-Z0-9_]+\\s*}}/.test(subject+"\\n"+body))throw Error("Please select the required customer/application context or complete the template fields before sending");
       var r=await api("/api/email/send",{method:"POST",body:JSON.stringify({to:to.length===1?to[0]:to,cc:cc.length?cc:undefined,bcc:bcc.length?bcc:undefined,subject,body,attachments:files,customer_id:customer,application_id:application})});
       if(!r.data||r.data.ok!==true)throw Error(r.data&&r.data.message||"Email send failed");
       closeModal();toast("Email sent successfully");mailPage();
