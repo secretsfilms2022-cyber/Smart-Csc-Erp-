@@ -114,7 +114,13 @@ let finalSource = built.replace(
 );
 
 // APP_JS intentionally contains the BULK_PATCH delimiter as text.
-// Do not alter that delimiter: LOGIN_APP_JS slices the string at runtime.
+// Normalize the known escaped-quote corruption at this delimiter so the
+// browser-facing LOGIN_APP_JS ends exactly at the IIFE terminator.
+const badAppJsDelimiter = "\\n})();\\\\\";\\nconst BULK_PATCH=";
+const goodAppJsDelimiter = "\\n})();\\nconst BULK_PATCH=";
+if (finalSource.includes(badAppJsDelimiter)) {
+  finalSource = finalSource.replace(badAppJsDelimiter, goodAppJsDelimiter);
+}
 if (!finalSource.includes("MAIL_MODULE_V1") || !finalSource.includes("window.mailPage=mailPage")) {
   throw new Error("MAIL_MODULE_BUILD_ASSERTION_FAILED: Mail module was not included in dist-worker.js");
 }
