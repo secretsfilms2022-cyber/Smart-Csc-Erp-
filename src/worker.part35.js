@@ -21,13 +21,13 @@ async function atomicMcpCall(toolName,args){
 function b64Bytes(v){const raw=atob(v);const out=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);return out}
 async function verifyAtomicWebhook(req,raw,event){
  const id=req.headers.get("webhook-id")||"",ts=req.headers.get("webhook-timestamp")||"",sig=req.headers.get("webhook-signature")||"";
- const secret=typeof ATOMIC_MAIL_WEBHOOK_SECRET!=="undefined"?String(ATOMIC_MAIL_WEBHOOK_SECRET||""):"";
- if(event&&event.type==="verification"&&!secret)return true;
- if(!secret||!id||!ts||!sig)throw new Error("Webhook authentication is not configured");
+ const secrets=[typeof ATOMIC_MAIL_WEBHOOK_SECRET!=="undefined"?String(ATOMIC_MAIL_WEBHOOK_SECRET||""):"",typeof ATOMIC_MAIL_WEBHOOK_SECRET_PREVIOUS!=="undefined"?String(ATOMIC_MAIL_WEBHOOK_SECRET_PREVIOUS||""):""].filter(Boolean);
+ if(event&&event.type==="verification"&&!secrets.length)return true;
+ if(!secrets.length||!id||!ts||!sig)throw new Error("Webhook authentication is not configured");
  const n=Number(ts);if(!/^\d+$/.test(ts)||!Number.isFinite(n)||Math.abs(Math.floor(Date.now()/1000)-n)>300)throw new Error("Webhook timestamp outside tolerance");
- const key=await crypto.subtle.importKey("raw",b64Bytes(secret.replace(/^whsec_/,"")),{name:"HMAC",hash:"SHA-256"},false,["verify"]);
+ for(const secret of secrets){ const key=await crypto.subtle.importKey("raw",b64Bytes(secret.replace(/^whsec_/,"")),{name:"HMAC",hash:"SHA-256"},false,["verify"]);
  const data=new TextEncoder().encode(id+"."+ts+"."+raw);
- for(const entry of sig.split(/\s+/).filter(x=>x.startsWith("v1,"))){try{if(await crypto.subtle.verify("HMAC",key,b64Bytes(entry.slice(3)),data))return true}catch(e){}}
+ for(const entry of sig.split(/\s+/).filter(x=>x.startsWith("v1,"))){try{if(await crypto.subtle.verify("HMAC",key,b64Bytes(entry.slice(3)),data))return true}catch(e){}} }
  throw new Error("Invalid webhook signature");
 }
 async function atomicWebhookHandler(req,ctx){
