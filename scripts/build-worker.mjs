@@ -116,7 +116,7 @@ let finalSource = built.replace(
 // APP_JS intentionally contains the BULK_PATCH delimiter as text.
 // Normalize the known escaped-quote corruption at this delimiter so the
 // browser-facing LOGIN_APP_JS ends exactly at the IIFE terminator.
-const badAppJsDelimiter = "\\n})();\\\\\";\\nconst BULK_PATCH=";
+const badAppJsDelimiter = "\\n})();\\\";\\nconst BULK_PATCH=";
 const goodAppJsDelimiter = "\\n})();\\nconst BULK_PATCH=";
 if (finalSource.includes(badAppJsDelimiter)) {
   finalSource = finalSource.replace(badAppJsDelimiter, goodAppJsDelimiter);
