@@ -2,6 +2,13 @@ const MAIL_MODULE_JS = String.raw`
 /* MAIL_MODULE_V1 */
 (function(){
   "use strict";
+  /* MAIL_TOAST_V1 */
+  var toast = (typeof window.toast === "function") ? window.toast : function(message,isError){
+    var n=document.getElementById("globalToast");
+    if(!n){n=document.createElement("div");n.id="globalToast";n.style.cssText="position:fixed;right:20px;bottom:20px;z-index:99999;max-width:420px;padding:12px 16px;border-radius:12px;background:"+(isError?"#7f1d1d":"#0f766e")+";color:#fff;font:600 14px Arial;box-shadow:0 8px 24px rgba(0,0,0,.2)";document.body.appendChild(n)}
+    n.textContent=message||"";n.style.display="block";clearTimeout(window.__scToastTimer);window.__scToastTimer=setTimeout(function(){n.style.display="none"},3200);
+  };
+  window.toast=toast;
   if(!Array.isArray(window.__mailModuleLoaded?[]:null)){}
   var mailState={folder:"inbox",rows:[],meta:[],templates:[],search:"",selected:null};
   function mailEsc(v){return typeof esc==="function"?esc(v):String(v==null?"":v).replace(/[&<>"]/g,function(c){return c==="&"?"&amp;":c==="<"?"&lt;":c===">"?"&gt;":"&quot;"})}
