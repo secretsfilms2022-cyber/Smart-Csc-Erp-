@@ -15,13 +15,14 @@ const required = [
   "/health",
   "ATOMIC_MAIL_WEBHOOK_SECRET",
   "customer_communications",
-  "helpline@smartcsc.work.gd"
+  "helpline@smartcsc.work.gd",
+  "MAIL_TOAST_V1"
 ];
 const missing = required.filter((needle) => !source.includes(needle));
 if (missing.length) {
   throw new Error("Worker integrity check failed; missing: " + missing.join(", "));
 }
-if (!source.includes("window.mailPage=mailPage") || source.includes("var originalGo=go;")) {
+if (!source.includes("window.mailPage=mailPage") || !source.includes("MAIL_TOAST_V1") || source.includes("var originalGo=go;")) {
   throw new Error("Mail module bootstrap integrity check failed; cross-scope navigation dependency detected");
 }
 if (/8fad7d9b-5609-4d14-b81d-5047cf01f41b/.test(source)) {
