@@ -281,7 +281,8 @@ const MAIL_MODULE_JS = String.raw`
     var b=document.querySelector("#mailComposeForm button[type=submit]");if(b){b.disabled=true;b.textContent="Sending…"}
     try{
       var files=await mailFiles(),to=splitEmails(document.getElementById("mailTo").value),cc=splitEmails(document.getElementById("mailCc").value),bcc=splitEmails(document.getElementById("mailBcc").value),subject=document.getElementById("mailSubject").value.trim(),body=document.getElementById("mailBody").value,customer=document.getElementById("mailCustomer").value||null,application=document.getElementById("mailApplication").value||null;
-      if(!to.length)throw Error("Enter at least one recipient");\n      if(/{{\\s*[a-zA-Z0-9_]+\\s*}}/.test(subject+"\\n"+body))throw Error("Please select the required customer/application context or complete the template fields before sending");
+      if(!to.length)throw Error("Enter at least one recipient");
+      if(/{{\\s*[a-zA-Z0-9_]+\\s*}}/.test(subject+"\\n"+body))throw Error("Please select the required customer/application context or complete the template fields before sending");
       var r=await api("/api/email/send",{method:"POST",body:JSON.stringify({to:to.length===1?to[0]:to,cc:cc.length?cc:undefined,bcc:bcc.length?bcc:undefined,subject,body,attachments:files,customer_id:customer,application_id:application})});
       if(!r.data||r.data.ok!==true)throw Error(r.data&&r.data.message||"Email send failed");
       closeModal();toast("Email sent successfully");mailPage();
