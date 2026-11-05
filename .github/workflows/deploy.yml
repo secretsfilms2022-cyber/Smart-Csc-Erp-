@@ -52,7 +52,7 @@ jobs:
           const appJs = await fetch(base + "/app.js", { cache: "no-store" });
           if (!appJs.ok) throw new Error("ERP app.js check failed: HTTP " + appJs.status);
           const appJsText = await appJs.text();
-          if (!appJsText.includes("MAIL_MODULE_V1") || !appJsText.includes("__SMART_CSC_MAIL_READY__")) {
+          if (!appJsText.includes("MAIL_MODULE_V1") || !appJsText.includes("__SMART_CSC_MAIL_READY__") || !appJsText.includes("MAIL_TOAST_V1")) {
             throw new Error("Mail module was not included in production app.js");
           }
           const challenge = "ci-" + Date.now();
