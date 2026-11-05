@@ -113,14 +113,8 @@ let finalSource = built.replace(
   'return new Response(repairUtf8Mojibake(LOGIN_APP_JS)+DOM_MOJIBAKE_REPAIR_SCRIPT,'
 );
 
-// Defensive repair for the generated APP_JS literal. Some source-part boundaries can
-// leave the terminal quote out of the assembled browser bundle; never ship that.
-const appJsClose = "\\n})();\\nconst BULK_PATCH=\\\"\\\";";
-const appJsCloseFixed = "\\n})();\\\";\\nconst BULK_PATCH=\\\"\\\";";
-if (finalSource.includes(appJsClose)) {
-  finalSource = finalSource.replace(appJsClose, appJsCloseFixed);
-}
-
+// APP_JS intentionally contains the BULK_PATCH delimiter as text.
+// Do not alter that delimiter: LOGIN_APP_JS slices the string at runtime.
 if (!finalSource.includes("MAIL_MODULE_V1") || !finalSource.includes("window.mailPage=mailPage")) {
   throw new Error("MAIL_MODULE_BUILD_ASSERTION_FAILED: Mail module was not included in dist-worker.js");
 }
